@@ -79,7 +79,7 @@ class ByteCountTests {
 
     @Test
     fun `modulo by zero throws`() {
-        assertFailsWith<IllegalArgumentException> { 42L.bytes % 0L }
+        assertFailsWith<ArithmeticException> { 42L.bytes % 0L }
     }
 
     @Test
@@ -171,7 +171,7 @@ class ByteCountTests {
     @Test
     fun `multiply by negative one`() {
         val x = 789L.bytes
-        assertEquals<ByteCount>(-x, x * ByteCount(-1L))
+        assertEquals(-x, x * ByteCount(-1L))
     }
 
     @Test
@@ -267,7 +267,7 @@ class ByteCountTests {
     fun `equals and hashCode consistency`() {
         val x = 555L.bytes
         val y = ByteCount(x.bytes)
-        assertTrue(x == y)
+        assertEquals(x, y)
         assertEquals(x.hashCode(), y.hashCode())
     }
 

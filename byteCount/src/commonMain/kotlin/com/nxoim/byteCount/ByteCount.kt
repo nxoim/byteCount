@@ -7,25 +7,58 @@ import kotlin.contracts.InvocationKind
 import kotlin.contracts.contract
 import kotlin.jvm.JvmInline
 
+/**
+ * A value class for counting bytes with overflow-safe arithmetic.
+ *
+ * Provides conversion to whole units (KB, MB, etc.) and component breakdown
+ * functions for both binary (KiB, MiB) and decimal (KB, MB) units.
+ *
+ * Example:
+ * ```kotlin
+ * fun main() {
+ *     val availableStorage = 2.gigabytes
+ *     val storageBrokenDown = availableStorage.toReadableString()
+ *
+ *     println("Available storage: $storageBrokenDown")
+ * }
+ *
+ * fun ByteCount.toReadableString() = this.toDecimalComponents { megabytes, kilobytes, bytes ->
+ *    "$megabytes MB $kilobytes KB"
+ * }
+ * ```
+ * 
+ * @see toDecimalComponents
+ * @see toBinaryComponents
+ */
 @JvmInline
 value class ByteCount(val bytes: Long) {
+    /** Truncated whole number of kilobytes (1000 bytes). */
     val inWholeKilobytes: Long get() = bytes / Kilobyte.bytes
+    /** Truncated whole number of megabytes (1,000,000 bytes). */
     val inWholeMegabytes: Long get() = bytes / Megabyte.bytes
+    /** Truncated whole number of gigabytes (1,000,000,000 bytes). */
     val inWholeGigabytes: Long get() = bytes / Gigabyte.bytes
+    /** Truncated whole number of terabytes (1,000,000,000,000 bytes). */
     val inWholeTerabytes: Long get() = bytes / Terabyte.bytes
+    /** Truncated whole number of petabytes (1,000,000,000,000,000 bytes). */
     val inWholePetabytes: Long get() = bytes / Petabyte.bytes
 
-    val inWholeKibibytes: Long get() = bytes / Kibibyte.bytes
-    val inWholeMebibytes: Long get() = bytes / Mebibyte.bytes
-    val inWholeGibibytes: Long get() = bytes / Gibibyte.bytes
-    val inWholeTebibytes: Long get() = bytes / Tebibyte.bytes
-    val inWholePebibytes: Long get() = bytes / Pebibyte.bytes
+    /** Truncated whole number of kibibytes (1024 bytes). */
+    val inWholeKibibytes: Long get() = bytes shr 10
+    /** Truncated whole number of mebibytes (1,048,576 bytes). */
+    val inWholeMebibytes: Long get() = bytes shr 20
+    /** Truncated whole number of gibibytes (1,073,741,824 bytes). */
+    val inWholeGibibytes: Long get() = bytes shr 30
+    /** Truncated whole number of tebibytes (1,099,511,627,776 bytes). */
+    val inWholeTebibytes: Long get() = bytes shr 40
+    /** Truncated whole number of pebibytes (1,125,899,906,842,624 bytes). */
+    val inWholePebibytes: Long get() = bytes shr 50
 
     override fun toString() = "$bytes bytes"
 
+    /** Overflow-safe addition. Returns Max/Min on overflow. */
     operator fun plus(other: ByteCount): ByteCount {
         val result = this.bytes + other.bytes
-        // if signs of operands are same but result's sign is different.
         return if ((this.bytes xor result) and (other.bytes xor result) < 0) {
             if (this.bytes > 0) ByteCount.Max else ByteCount.Min
         } else {
@@ -33,15 +66,16 @@ value class ByteCount(val bytes: Long) {
         }
     }
 
+    /** Overflow-safe subtraction. Returns Max/Min on overflow. */
     operator fun minus(other: ByteCount): ByteCount {
         val result = this.bytes - other.bytes
-        // true if x and y have different signs, AND x and result have different signs.
         return if (((this.bytes xor other.bytes) < 0) && ((this.bytes xor result) < 0)) {
             if (other.bytes < 0) Max else Min
         } else
             ByteCount(result)
     }
 
+    /** Overflow-safe multiplication. Returns Max/Min on overflow. */
     operator fun times(scale: Long): ByteCount {
         if (bytes == 0L || scale == 0L) return Zero
         try {
@@ -55,12 +89,8 @@ value class ByteCount(val bytes: Long) {
     operator fun times(scale: Int): ByteCount = times(scale.toLong())
     operator fun times(scale: Short): ByteCount = times(scale.toLong())
 
-    operator fun rem(other: Long): ByteCount {
-        if (other == 0L) {
-            throw IllegalArgumentException("Modulo by zero is undefined.")
-        }
-        return ByteCount(this.bytes % other)
-    }
+    operator fun rem(other: Long): ByteCount = ByteCount(this.bytes % other)
+
     operator fun rem(other: ByteCount): ByteCount = rem(other.bytes)
     operator fun rem(other: Int): ByteCount = rem(other.toLong())
     operator fun rem(other: Short): ByteCount = rem(other.toLong())
@@ -278,7 +308,9 @@ val Short.pebibytes: ByteCount get() = ByteCount.Pebibyte * this
 val Int.pebibytes: ByteCount get() = ByteCount.Pebibyte * this
 val Long.pebibytes: ByteCount get() = ByteCount.Pebibyte * this
 
-private fun multiplyExact(a: Long, b: Long): Long {
+internal expect fun multiplyExact(a: Long, b: Long): Long
+
+internal fun fallbackMultiplyExact(a: Long, b: Long): Long {
     if ((a == Long.MIN_VALUE && b == -1L) || b == Long.MIN_VALUE && a == -1L)
         throw ArithmeticException()
 
