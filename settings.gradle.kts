@@ -1,4 +1,3 @@
-rootProject.name = "byteCountThing"
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
 pluginManagement {
